@@ -1,0 +1,9 @@
+{
+  "name": "emmanuel-bot-v4",
+  "main": "index.js",
+  "scripts": { "start": "node index.js" },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.5",
+    "pino": "^8.17.0"
+  }
+}
