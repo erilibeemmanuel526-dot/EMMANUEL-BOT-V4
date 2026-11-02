@@ -1,10 +1,17 @@
-const { default: makeWASocket, useMultiFileAuthState, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys')
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 10000;
+app.get('/', (req, res) => res.send('Bot is Live!'));
+app.listen(PORT, () => console.log(`Port ${PORT} open`));
+
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const P = require('pino')
+
 async function start() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys')
+    const { state, saveCreds } = await useMultiFileAuthState('auth')
     const sock = makeWASocket({
-        auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, P({level:'silent'}).child({})) },
-        logger: P({level:'silent'}),
+        auth: { creds: state.creds, keys: state.keys },
+        logger: P({level: 'silent'}),
         printQRInTerminal: false,
         browser: ["Ubuntu","Chrome","20.0.04"]
     })
@@ -14,6 +21,8 @@ async function start() {
         const code = await sock.requestPairingCode("2349137142411")
         console.log(`CODE FOR 2349137142411: ${code}`)
     }
-    sock.ev.on('connection.update', ({connection})=>{ if(connection==='open') console.log('CONNECTED!') })
+    sock.ev.on('connection.update', ({connection}) => {
+        if(connection === 'open') console.log('Bot Connected!')
+    })
 }
 start()
