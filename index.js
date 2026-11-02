@@ -10,7 +10,8 @@ console.log('Starting EMMANUEL-BOT-V4...');
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const P = require('pino');
-const readline = require('readline');
+
+const PHONE_NUMBER = '2349137142411';
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -22,37 +23,33 @@ async function startBot() {
     browser: ['EMMANUEL-BOT-V4', 'Chrome', '1.0']
   });
 
-  // Handle QR / Pairing Code
-  sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-    
-    if (qr) {
-      console.log('\n\n=== QR CODE GENERATED ===');
-      console.log(qr);
-      console.log('Copy this QR string and convert to image, OR use pairing code below\n');
-    }
+  if (!sock.authState.creds.registered) {
+    setTimeout(async () => {
+      try {
+        const code = await sock.requestPairingCode(PHONE_NUMBER);
+        console.log('\n\n========================================');
+        console.log(`🔑 YOUR PAIRING CODE FOR ${PHONE_NUMBER}: ${code}`);
+        console.log('========================================');
+        console.log('Go to WhatsApp > Settings > Linked Devices');
+        console.log('> Link a Device > Link with phone number');
+        console.log(`> Enter this code: ${code}`);
+        console.log('========================================\n\n');
+      } catch (e) {
+        console.log('Failed to get pairing code:', e.message);
+      }
+    }, 5000);
+  }
 
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect } = update;
     if (connection === 'close') {
       const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
       console.log('Connection closed, reconnecting:', shouldReconnect);
       if (shouldReconnect) startBot();
     } else if (connection === 'open') {
-      console.log('✅ BOT CONNECTED SUCCESSFULLY!');
+      console.log('✅ BOT CONNECTED SUCCESSFULLY! - EMMANUEL-BOT-V4 LIVE!');
     }
   });
-
-  // Ask for pairing code after 3 seconds
-  setTimeout(async () => {
-    if (!sock.authState.creds.registered) {
-      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-      rl.question('Enter your WhatsApp number with country code (e.g 2348012345678): ', async (number) => {
-        const code = await sock.requestPairingCode(number.trim());
-        console.log(`\n🔑 YOUR PAIRING CODE: ${code}`);
-        console.log(`Go to WhatsApp > Linked Devices > Link with phone number > Enter code: ${code}\n`);
-        rl.close();
-      });
-    }
-  }, 5000);
 
   sock.ev.on('creds.update', saveCreds);
 
