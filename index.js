@@ -5,7 +5,6 @@ const app = express();
 let qrDataUrl = null;
 let isConnected = false;
 
-// WEB SERVER FOR QR
 app.get('/', async (req, res) => {
   if(isConnected){
     res.send('<h1>✅ EMMANUEL-BOT-V4 IS ACTIVE!</h1><p>Bot is online and working.</p><p>Device: Google Chrome (EMMANUEL)</p>');
@@ -17,7 +16,6 @@ app.get('/', async (req, res) => {
 });
 app.listen(10000, () => console.log('WEB READY ON 10000'));
 
-// WHATSAPP BOT
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const P = require('pino');
 
@@ -37,7 +35,7 @@ async function startBot() {
     const { qr, connection, lastDisconnect } = u;
     if(qr){
       qrDataUrl = await QRCode.toDataURL(qr);
-      console.log('QR READY - Go to website https://emmanuel-bot-v4.onrender.com');
+      console.log('QR READY');
       isConnected = false;
     }
     if(connection === 'open'){
@@ -48,17 +46,14 @@ async function startBot() {
     if(connection === 'close'){
       isConnected = false;
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('Connection closed, reconnecting:', shouldReconnect);
       if(shouldReconnect) setTimeout(startBot, 5000);
-      else console.log('Logged out, need new QR');
     }
   });
 
-  // COMMANDS
   sock.ev.on('messages.upsert', async (m) => {
     try{
       const msg = m.messages[0];
-      if(!msg.message || msg.key.fromMe) return;
+      if(!msg.message) return;
       const from = msg.key.remoteJid;
       const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || '';
       const prefix = '.';
@@ -77,12 +72,11 @@ async function startBot() {
 .alive - Check bot alive
 .menu - This menu
 
-*MORE COMING SOON...*
 Bot by Emmanuel
 Active ✅`});
       }
       else if(command === 'alive'){
-        await sock.sendMessage(from, {text: '*EMMANUEL-BOT-V4 is ALIVE and ACTIVE!* ✅🔥\n\nLinked Device: Google Chrome (EMMANUEL)\nStatus: Active\n\nDeployed on Render'});
+        await sock.sendMessage(from, {text: '*EMMANUEL-BOT-V4 is ALIVE and ACTIVE!* ✅🔥\nLinked Device: Google Chrome (EMMANUEL)\nStatus: Active\nDeployed on Render'});
       }
     }catch(e){ console.log('Msg error', e)}
   });
