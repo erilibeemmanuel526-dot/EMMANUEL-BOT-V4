@@ -1,28 +1,29 @@
 const express = require('express');
+const QRCode = require('qrcode');
 const app = express();
-const PORT = process.env.PORT || 10000;
-app.get('/', (req, res) => res.send('Bot is Live!'));
-app.listen(PORT, () => console.log(`Port ${PORT} open`));
+let qrDataUrl = null;
 
-const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const P = require('pino')
+app.get('/', async (req, res) => {
+  if(qrDataUrl) res.send(`<h2>SCAN THIS QR</h2><img src="${qrDataUrl}" width="350"/><p>Open WhatsApp > Linked Devices > Link a device > Scan<br>Refresh every 30s</p><script>setTimeout(()=>location.reload(),30000)</script>`);
+  else res.send('<h2>Waiting for QR...</h2><p>Refresh in 10 seconds</p><script>setTimeout(()=>location.reload(),10000)</script>');
+});
 
-async function start() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth')
-    const sock = makeWASocket({
-        auth: { creds: state.creds, keys: state.keys },
-        logger: P({level: 'silent'}),
-        printQRInTerminal: false,
-        browser: ["Ubuntu","Chrome","20.0.04"]
-    })
-    sock.ev.on('creds.update', saveCreds)
-    if (!sock.authState.creds.registered) {
-        await new Promise(r=>setTimeout(r,4000))
-        const code = await sock.requestPairingCode("2349137142411")
-        console.log(`CODE FOR 2349137142411: ${code}`)
-    }
-    sock.ev.on('connection.update', ({connection}) => {
-        if(connection === 'open') console.log('Bot Connected!')
-    })
+app.get('/qr', (req,res) => res.redirect('/'));
+
+app.listen(10000, () => console.log('WEB READY'));
+
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const P = require('pino');
+
+async function bot() {
+  const { state, saveCreds } = await useMultiFileAuthState('./auth');
+  const sock = makeWASocket({ auth: state, logger: P({level:'silent'}), printQRInTerminal: true, browser: ['EMMANUEL','Chrome','1.0'] });
+  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('connection.update', async (u) => {
+    const { qr, connection } = u;
+    if(qr) { qrDataUrl = await QRCode.toDataURL(qr); console.log('QR READY - Go to website'); }
+    if(connection === 'open') { console.log('CONNECTED SUCCESS!'); qrDataUrl = null; }
+    if(connection === 'close') { console.log('Closed, restarting...'); setTimeout(bot, 5000); }
+  });
 }
-start()
+bot();
