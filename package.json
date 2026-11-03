@@ -1,11 +1,14 @@
 {
-  "name": "whatsapp-bot",
+  "name": "lovly-whatsapp-bot",
+  "version": "1.0.0",
   "main": "index.js",
-  "dependencies": {
-    "@whiskeysockets/baileys": "latest",
-    "pino": "latest"
-  },
   "scripts": {
     "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "pino": "latest",
+    "express": "latest",
+    "qrcode-terminal": "latest"
   }
 }
