@@ -2,49 +2,50 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = requi
 const P = require('pino');
 const express = require('express');
 const fs = require('fs');
-
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 if (process.env.SESSION_ID) {
   try {
     if (!fs.existsSync('./auth')) fs.mkdirSync('./auth');
-    fs.writeFileSync('./auth/creds.json', Buffer.from(process.env.SESSION_ID, 'base64').toString());
-    console.log("Session OK");
-  } catch(e){ console.log(e); }
+    fs.writeFileSync('./auth/creds.json', Buffer.from(process.env.SESSION_ID,'base64').toString());
+    console.log("✅ Session OK");
+  } catch(e){console.log(e)}
 }
 
 async function startBot(){
   const { state, saveCreds } = await useMultiFileAuthState('./auth');
-  const sock = makeWASocket({ auth: state, logger: P({level:'silent'}), browser:['Emmanuel Bot','Chrome','1.0'] });
+  const sock = makeWASocket({ auth: state, logger: P({level:'silent'}), browser:['V8 Ultimate','Chrome','1.0.0'] });
   sock.ev.on('creds.update', saveCreds);
+  
+  console.log("Bot starting...");
 
-  sock.ev.on('messages.upsert', async ({messages})=>{
-    for(let m of messages){
-      if(!m.message) continue;
-      const text = m.message.conversation || m.message.extendedTextMessage?.text || "";
-      if(!text) continue;
-      const from = m.key.remoteJid;
-      const low = text.toLowerCase().trim();
-      console.log("Got:", low);
-
-      if(low === 'hii' || low === 'hi' || low === 'hello'){
-        await sock.sendMessage(from, {text: "✅ AUTO-REPLY WORKING! Hello, V8 don reply you! 🔥"});
-      }
-      if(low === '.ping'){
-        await sock.sendMessage(from, {text: "🏓 Pong! NEW CODE LIVE! Deploy don work!"});
-      }
-      if(low === '.menu'){
-        await sock.sendMessage(from, {text: "🔥 NEW MENU 🔥\n.ping\nHii/Hi/Hello auto reply\nBot dey work now!"});
+  sock.ev.on('messages.upsert', async (mUp)=>{
+    console.log("EVENT FIRED! Message received!");
+    const messages = mUp.messages;
+    for(const msg of messages){
+      if(!msg.message) continue;
+      const from = msg.key.remoteJid;
+      const text = msg.message.conversation || msg.message.extendedTextMessage?.text || "no text";
+      console.log(`From: ${from} Text: ${text} fromMe:${msg.key.fromMe}`);
+      
+      try{
+        // FORCE REPLY TO EVERY MESSAGE FOR TEST!
+        await sock.sendMessage(from, {text: `🤖 FORCE REPLY: I see you said "${text}" - BOT IS LIVE! ✅`});
+        console.log("Reply sent!");
+      }catch(e){
+        console.log("Reply error:", e);
       }
     }
   });
 
   sock.ev.on('connection.update', (u)=>{
+    console.log("Connection:", u.connection);
     if(u.connection === 'close' && u.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) startBot();
+    if(u.connection === 'open') console.log("✅ Connected to WhatsApp!");
   });
 }
 
 startBot();
-app.get('/', (req,res)=>res.send('BOT LIVE V3'));
+app.get('/', (req,res)=>res.send('DEBUG BOT LIVE'));
 app.listen(PORT, ()=>console.log("Server on "+PORT));
