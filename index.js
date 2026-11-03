@@ -3,140 +3,110 @@ const P = require('pino');
 const express = require('express');
 const ytSearch = require('yt-search');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Store messages for anti-delete
 const messageStore = new Map();
+global.paused = false;
 
-// AUTO REPLY LIST - You fit add more!
 const autoReplies = {
   "hi": "Hello Boss! 👋 V8 dey active!",
-  "hello": "Hello! How you dey? 😊",
-  "bot": "Yes boss? V8 dey hear you!",
-  "love you": "Love you too ❤️ V8 dey blush",
-  "how are you": "I dey fine! Thanks to you wey deploy me ✅"
+  "hello": "Hello! How you dey?",
+  "bot": "Yes boss? V8 dey hear you!"
 };
+
+// --- RESTORE SESSION FROM ENV ---
+if (process.env.SESSION_ID) {
+  try {
+    const authPath = './auth';
+    if (!fs.existsSync(authPath)) fs.mkdirSync(authPath);
+    const creds = Buffer.from(process.env.SESSION_ID, 'base64').toString();
+    fs.writeFileSync(path.join(authPath, 'creds.json'), creds);
+    console.log("✅ Session restored from ENV");
+  } catch (e) {
+    console.log("❌ Failed to restore session", e);
+  }
+}
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('./auth');
-  
   const sock = makeWASocket({
     auth: state,
     logger: P({ level: 'silent' }),
-    printQRInTerminal: false,
     browser: ['V8 Ultimate', 'Chrome', '1.0']
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // SAVE MESSAGE FOR ANTI-DELETE
   sock.ev.on('messages.upsert', async ({ messages }) => {
+    if (global.paused) return;
     for (let msg of messages) {
-      if (!msg.key.fromMe) {
-        const id = msg.key.id;
-        messageStore.set(id, msg);
+      if (!msg.message) continue;
+      const text = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
+      if (!text || msg.key.fromMe) {
+        // still store for anti-delete
+        if (!msg.key.fromMe) messageStore.set(msg.key.id, msg);
+        continue;
       }
-      const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
-      const lowerText = text.toLowerCase();
       const from = msg.key.remoteJid;
+      const lower = text.toLowerCase();
+      
+      // store
+      messageStore.set(msg.key.id, msg);
 
-      if (!text || msg.key.fromMe) continue;
-
-      // --- AUTO REPLY ---
-      for (let key in autoReplies) {
-        if (lowerText.includes(key)) {
-          await sock.sendMessage(from, { text: autoReplies[key] });
+      // auto reply
+      for (let k in autoReplies) {
+        if (lower.includes(k)) {
+          await sock.sendMessage(from, { text: autoReplies[k] });
           break;
         }
       }
 
-      // --- COMMANDS ---
-      if (text === '.ping') {
-        await sock.sendMessage(from, { text: '🏓 Pong! V8 Active - 42ms' });
-      }
-      if (text === '.pause') {
-        global.paused = true;
-        await sock.sendMessage(from, { text: '⏸️ V8 Paused' });
-      }
-      if (text === '.resume') {
-        global.paused = false;
-        await sock.sendMessage(from, { text: '▶️ V8 Resumed! I dey back!' });
-      }
+      if (text === '.ping') await sock.sendMessage(from, { text: '🏓 Pong! V8 Active' });
+      if (text === '.pause') { global.paused = true; await sock.sendMessage(from, { text: '⏸️ Paused' }); }
+      if (text === '.resume') { global.paused = false; await sock.sendMessage(from, { text: '▶️ Resumed! I dey back!' }); }
       if (text === '.menu') {
-        await sock.sendMessage(from, { text: `V8 MENU 🔥:
-.ping - Check bot
-.pause / .resume
-.song <name> - Search songs
-.menu - This menu
-Anti-delete ✅ Active
-Auto-reply ✅ Active` });
+        await sock.sendMessage(from, { text: `V8 MENU 🔥:\n.ping\n.pause / .resume\n.song <name>\nAnti-delete ✅\nAuto-reply ✅` });
       }
-
-      // --- SONG SEARCH ---
       if (text.startsWith('.song ')) {
-        const query = text.replace('.song ', '');
-        if (!query) return sock.sendMessage(from, { text: 'Type song name! Eg: .song Burna Boy Last Last' });
-        await sock.sendMessage(from, { text: `🔍 Searching "${query}"...` });
+        const query = text.slice(6);
+        await sock.sendMessage(from, { text: `🔍 Searching ${query}...` });
         try {
           const r = await ytSearch(query);
-          const video = r.videos[0];
-          if (!video) return sock.sendMessage(from, { text: 'Song not found 😢' });
-          
-          await sock.sendMessage(from, {
-            image: { url: video.thumbnail },
-            caption: `🎵 *${video.title}*\n\n👤 ${video.author.name}\n⏱️ ${video.timestamp}\n👁️ ${video.views} views\n\n🔗 ${video.url}\n\n*Send .ytmp3 ${video.url} soon to download (coming)*`
-          });
-        } catch (e) {
-          await sock.sendMessage(from, { text: 'Error searching song!' });
-        }
+          const v = r.videos[0];
+          if (!v) return sock.sendMessage(from, { text: 'Not found' });
+          await sock.sendMessage(from, { image: { url: v.thumbnail }, caption: `🎵 ${v.title}\n${v.url}` });
+        } catch {}
       }
     }
   });
 
-  // --- ANTI-DELETE LOGIC ---
   sock.ev.on('messages.update', async (updates) => {
-    for (let update of updates) {
-      if (update.update?.status === 4 || update.keyId) { // Deleted
-        const id = update.keyId || update.key?.id;
-        const oldMsg = messageStore.get(id);
-        if (oldMsg) {
-          const from = oldMsg.key.remoteJid;
-          const sender = oldMsg.key.participant || from;
-          const content = oldMsg.message?.conversation || oldMsg.message?.extendedTextMessage?.text || "Media message";
-          
-          await sock.sendMessage(from, {
-            text: `🚨 *ANTI-DELETE* 🚨\n\n👤 @${sender.split('@')[0]} deleted:\n\n💬 ${content}\n\n_V8 caught am!_`,
-            mentions: [sender]
-          });
+    for (let u of updates) {
+      if (u.update?.message === null) { // deleted for everyone
+        const old = messageStore.get(u.key.id);
+        if (old) {
+          const from = old.key.remoteJid;
+          const txt = old.message.conversation || old.message.extendedTextMessage?.text || "Media";
+          await sock.sendMessage(from, { text: `🚨 *ANTI-DELETE* 🚨\nDeleted: ${txt}` });
         }
       }
     }
   });
 
-  // Keep for older Baileys versions
-  sock.ev.on('messages.delete', async (item) => {
-     // Some versions use this
-     console.log("Delete detected", item);
-  });
-
-  sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
-    if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-      startBot();
-    }
+  sock.ev.on('connection.update', (u) => {
+    if (u.connection === 'close' && u.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) startBot();
   });
 }
 
 startBot();
 
-// Web server
-app.get('/', (req, res) => res.send('✅ V8 ULTIMATE LIVE - AntiDelete + AutoReply + Song Search Active!'));
+app.get('/', (req, res) => res.send('✅ V8 ULTIMATE LIVE'));
 app.get('/session', (req, res) => {
   try {
     const creds = fs.readFileSync('./auth/creds.json');
     res.send(Buffer.from(creds).toString('base64'));
-  } catch { res.send('Bot not connected yet, scan QR first'); }
+  } catch { res.send('Not connected yet'); }
 });
-
-app.listen(PORT, () => console.log(`Server on ${PORT}`));
+app.listen(PORT);
