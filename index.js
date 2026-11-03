@@ -1,31 +1,24 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys')
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys')
 const P = require('pino')
 const express = require('express')
-const qrcode = require('qrcode-terminal')
 
 const app = express()
-app.get('/', (req, res) => res.send('Bot is Alive! Deploy OK - Nov 3'))
-app.listen(process.env.PORT || 10000, () => console.log('Server running'))
+app.get('/', (req, res) => res.send('Bot Alive'))
+app.listen(process.env.PORT || 3000)
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info')
-    const sock = makeWASocket({ 
-        auth: state, 
-        logger: P({ level: 'silent' }), 
-        browser: ["LOVLY","Chrome","1.0"] 
-    })
+    const { state, saveCreds } = await useMultiFileAuthState('auth')
+    const sock = makeWASocket({ auth: state, logger: P({ level: 'silent' }), printQRInTerminal: false })
     sock.ev.on('creds.update', saveCreds)
-    sock.ev.on('connection.update', ({ connection, qr, lastDisconnect }) => {
-        if(qr){
-            console.log('=== SCAN THIS QR ===')
-            qrcode.generate(qr, {small: true})
-        }
-        if(connection === 'close'){
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-            if(shouldReconnect) startBot()
-        } else if(connection === 'open'){
-            console.log('BOT CONNECTED SUCCESSFULLY!')
-        }
+    
+    if(!sock.authState.creds.registered){
+        let num = "234" // CHANGE TO YOUR WHATSAPP NUMBER 2349137142411
+        let code = await sock.requestPairingCode(num)
+        console.log("YOUR PAIR CODE IS: " + code)
+    }
+    
+    sock.ev.on('connection.update', (s) => {
+        if(s.connection === 'open') console.log('CONNECTED!')
     })
 }
 startBot()
