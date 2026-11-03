@@ -8,7 +8,6 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const store = new Map();
-global.paused = false;
 
 if (process.env.SESSION_ID) {
   try {
@@ -24,54 +23,37 @@ async function startBot(){
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('messages.upsert', async ({messages})=>{
-    if(global.paused) return;
     for(let m of messages){
       if(!m.message) continue;
-      const text = m.message.conversation || m.message.extendedTextMessage?.text || "";
+      const text = m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || "";
+      if(!text) continue;
       const from = m.key.remoteJid;
+      const isMe = m.key.fromMe;
+      console.log(`Message: ${text} from ${from} isMe:${isMe}`);
+      
       store.set(m.key.id, m);
       
-      if(m.key.fromMe) continue;
+      // FOR TEST - REPLY EVEN TO YOURSELF!
+      const low = text.toLowerCase().trim();
       
-      // AUTO REPLY - this go work now!
-      if(text.toLowerCase() === 'hii' || text.toLowerCase() === 'hi') {
-        await sock.sendMessage(from, {text:'Hello Boss! 👋 V8 dey active! Auto-reply don work!'});
+      if(low === 'hii' || low === 'hi' || low === 'hello' || low.includes('hii')) {
+        await sock.sendMessage(from, {text:'✅ AUTO-REPLY WORKING! Hello! V8 don reply you! 🔥'});
         continue;
       }
-      if(text.toLowerCase() === 'hello') {
-        await sock.sendMessage(from, {text:'Hello! How you dey? 😊'});
+      if(low === '.ping') {
+        await sock.sendMessage(from, {text:'🏓 Pong! V8 Active ✅ NEW CODE LIVE!'});
         continue;
       }
-
-      if(text === '.ping') await sock.sendMessage(from, {text:'🏓 Pong! V8 Active ✅'});
-      if(text === '.pause') {global.paused=true; await sock.sendMessage(from, {text:'⏸️ Paused'});}
-      if(text === '.resume') {global.paused=false; await sock.sendMessage(from, {text:'▶️ Resumed! I dey back!'});}
-      if(text === '.menu') {
-        await sock.sendMessage(from, {text:`🔥 V8 V2 MENU 🔥\n.ping\n.song Burna Boy\nHi/Hello (auto reply)\nAnti-delete Active ✅`});
-      }
-      if(text.startsWith('.song ')){
+      if(low.startsWith('.song ')){
         const q = text.slice(6);
-        await sock.sendMessage(from, {text:`🔍 Searching song: ${q}...`});
         try{
-          // Use free API
           const res = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&limit=1`);
           const song = res.data.results[0];
-          if(song) await sock.sendMessage(from, {text:`🎵 *${song.trackName}*\n👤 ${song.artistName}\n💿 ${song.collectionName}\n🔗 ${song.previewUrl}`});
-          else await sock.sendMessage(from, {text:'Song not found'});
-        }catch{ await sock.sendMessage(from, {text:'Search error'}); }
+          if(song) await sock.sendMessage(from, {text:`🎵 ${song.trackName} - ${song.artistName}\n${song.previewUrl}`});
+        }catch{}
       }
-    }
-  });
-
-  // ANTI-DELETE
-  sock.ev.on('messages.update', async (updates)=>{
-    for(let u of updates){
-      if(u.update && Object.keys(u.update).length === 0){ // deleted
-        const old = store.get(u.key.id);
-        if(old){
-          const txt = old.message.conversation || old.message.extendedTextMessage?.text || "Media";
-          await sock.sendMessage(old.key.remoteJid, {text:`🚨 ANTI-DELETE 🚨\nUser deleted: ${txt}`});
-        }
+      if(low === '.menu'){
+        await sock.sendMessage(from, {text:`🔥 V8 V3 FORCED MENU 🔥\n.hii -> auto reply\n.ping -> new code\n.song name\nTHIS IS NEW CODE!`});
       }
     }
   });
@@ -81,8 +63,5 @@ async function startBot(){
   });
 }
 startBot();
-app.get('/', (req,res)=>res.send('✅ V8 V2 LIVE - AutoReply + AntiDelete + Song'));
-app.get('/session', (req,res)=>{
-  try{ res.send(Buffer.from(fs.readFileSync('./auth/creds.json')).toString('base64')); }catch{res.send('Not ready');}
-});
-app.listen(PORT);
+app.get('/', (req,res)=>res.send('✅ V8 V3 FORCED LIVE'));
+app.listen(PORT, ()=>console.log("Live on "+PORT));
