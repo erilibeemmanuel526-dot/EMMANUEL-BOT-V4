@@ -7,36 +7,14 @@ const express = require('express');
 const QRCode = require('qrcode');
 const yts = require('yt-search');
 
-// WEBSITE FOR QR
 const app = express();
 let qrData = null;
 let isConnected = false;
-let messageStore = {}; // For Anti-Delete
+let messageStore = {};
 
 app.get('/', async (req, res) => {
     if (isConnected) {
-        res.send(`
-        <html><body style="text-align:center; font-family:sans-serif; padding:40px; background:#000; color:#0f0;">
-        <h1>✅ EMMANUEL-BOT-V4 CONNECTED! ✅</h1>
-        <h2 style="color:white;">Bot is LIVE!</h2>
-        <hr>
-        <div style="text-align:left; max-width:450px; margin:auto; background:#111; padding:20px; border-radius:10px; color:white;">
-        <h3 style="color:cyan;">🔥 COMMANDS:</h3>
-        <p><b>.menu</b> - Show all commands</p>
-        <p><b>.ping</b> - Check speed</p>
-        <p><b>.alive</b> - Bot status</p>
-        <p><b>.owner</b> - Owner info</p>
-        <p><b>.song [name]</b> - Search song</p>
-        <p><b>.play [name]</b> - Play music</p>
-        <p><b>.sticker</b> - Image to sticker</p>
-        <h3 style="color:cyan;">💬 AUTO REPLY:</h3>
-        <p>Bot auto replies to: hello, hi, hey, thanks, ANY message!</p>
-        <h3 style="color:cyan;">🚫 ANTI-DELETE:</h3>
-        <p>Bot catches deleted messages & recovers them!</p>
-        </div>
-        <p style="color:white;">Test: Use another phone send .menu to your number!</p>
-        </body></html>
-        `);
+        res.send(`<html><body style="text-align:center; font-family:sans-serif; padding:40px; background:#000; color:#0f0;"><h1>✅ EMMANUEL-BOT-V4 CONNECTED! ✅</h1><h2 style="color:white;">Bot is LIVE!</h2><hr><div style="text-align:left; max-width:450px; margin:auto; background:#111; padding:20px; border-radius:10px; color:white;"><h3 style="color:cyan;">🔥 COMMANDS:</h3><p><b>.menu</b> - Show all commands</p><p><b>.ping</b> - Check speed</p><p><b>.alive</b> - Bot status</p><p><b>.owner</b> - Owner info</p><p><b>.song [name]</b> - Search song</p><p><b>.play [name]</b> - Play music</p><p><b>.sticker</b> - Image to sticker</p><h3 style="color:cyan;">💬 AUTO REPLY:</h3><p>Bot auto replies to: hello, hi, hey, thanks, ANY message!</p><h3 style="color:cyan;">🚫 ANTI-DELETE:</h3><p>Bot catches deleted messages & recovers them!</p></div><p style="color:white;">Test: Use another phone send .menu to your number!</p></body></html>`);
     } else if (qrData) {
         try {
             const qrImage = await QRCode.toDataURL(qrData);
@@ -64,7 +42,6 @@ async function startBot() {
     const sock = makeWASocket({ auth: state, logger: P({ level: 'silent' }), printQRInTerminal: false, browser: ["EMMANUEL-BOT-V4", "Chrome", "4.0"] });
     sock.ev.on('creds.update', saveCreds);
     
-    // === ANTI-DELETE SYSTEM ===
     sock.ev.on('messages.update', async (updates) => {
         for (const update of updates) {
             try {
@@ -91,7 +68,6 @@ async function startBot() {
                                 else if (savedMsg.type === 'video') await sock.sendMessage(from, { video: savedMsg.buffer, caption: `*🚫 Deleted Video Recovered*` });
                             } catch (e) {}
                         }
-                        console.log(`🚫 ANTI-DELETE: ${originalId} recovered!`);
                     }
                 }
             } catch (e) { console.log("Anti-delete error:", e); }
@@ -118,7 +94,6 @@ async function startBot() {
             if (!body) return;
             console.log(`Message: ${body} | From: ${from}`);
 
-            // SAVE FOR ANTI-DELETE
             try {
                 messageStore[msg.key.id] = {
                     text: body, from: from, sender: msg.key.participant || from,
@@ -138,7 +113,6 @@ async function startBot() {
             const prefix = ".";
             const isCommand = body.startsWith(prefix);
 
-            // AUTO REPLY (No dot)
             if (!isCommand) {
                 const lower = body.toLowerCase();
                 if (lower.includes('hello') || lower === 'hi' || lower.includes('hey')) {
@@ -149,45 +123,16 @@ async function startBot() {
                     await sock.sendMessage(from, { text: `*You're welcome! 😊 - EMMANUEL-BOT-V4*` });
                     return;
                 }
-                await sock.sendMessage(from, { text: `*🤖 EMMANUEL-BOT-V4 HERE!*\n\nYou said: "${body}"\n\nI'm your WhatsApp assistant!\n\n*Type .menu for all commands!*\n*Try .ping, .alive, .song*` });
+                await sock.sendMessage(from, { text: `*🤖 EMMANUEL-BOT-V4 HERE!*\n\nYou said: "${body}"\n\nI'm your WhatsApp assistant!\n\n*Type .menu for all commands!*` });
                 return;
             }
 
-            // COMMANDS (With dot)
             const args = body.slice(prefix.length).trim().split(/ +/);
             const command = args.shift().toLowerCase();
             const q = args.join(" ");
 
             if (command === 'menu' || command === 'help') {
-                const menu = `*🤖 EMMANUEL-BOT-V4 MENU 🤖*
-
-*🔥 MAIN:*
-- .menu - Show this menu
-- .ping - Check speed
-- .alive - Bot status
-- .owner - Owner info
-
-*🎵 MUSIC:*
-- .song [name] - Search song
-- .play [name] - Play song
-- .video [name] - Video info
-
-*🛠️ TOOLS:*
-- .sticker - Image to sticker
-- .s - Short sticker
-
-*💬 AUTO REPLY:*
-Bot replies to hello, hi, thanks, ANY message without dot!
-
-*🚫 ANTI-DELETE:*
-Bot catches deleted messages & recovers images/videos!
-
-*Version: V4*
-*Prefix: .*
-*ONLINE ✅*
-*EMMANUEL-BOT-V4*
-`;
-                await sock.sendMessage(from, { text: menu });
+                await sock.sendMessage(from, { text: `*🤖 EMMANUEL-BOT-V4 MENU 🤖*\n\n*🔥 MAIN:*\n- .menu\n- .ping\n- .alive\n- .owner\n\n*🎵 MUSIC:*\n- .song [name]\n- .play [name]\n- .video [name]\n\n*🛠️ TOOLS:*\n- .sticker\n\n*💬 AUTO REPLY:* hello, hi, thanks, ANY message\n\n*🚫 ANTI-DELETE:* catches deleted messages\n\n*V4 | ONLINE ✅*` });
             }
             else if (command === 'ping') {
                 const start = Date.now();
@@ -198,23 +143,23 @@ Bot catches deleted messages & recovers images/videos!
                 await sock.sendMessage(from, { text: `*🤖 EMMANUEL-BOT-V4 ALIVE! ✅*\n\n*Version:* V4 Ultimate\n*Status:* ONLINE\n*Uptime:* ${Math.floor(process.uptime()/60)} min\n*Features:* QR Website, Auto Reply, Anti-Delete, Music\n\n*Type .menu*` });
             }
             else if (command === 'owner') {
-                await sock.sendMessage(from, { text: `*👑 EMMANUEL-BOT-V4 OWNER*\n\n*Bot:* EMMANUEL-BOT-V4\n*Developer:* Emmanuel\n*Features:* Full Bot\n*Status:* Active ✅` });
+                await sock.sendMessage(from, { text: `*👑 EMMANUEL-BOT-V4 OWNER*\n\n*Bot:* EMMANUEL-BOT-V4\n*Developer:* Emmanuel\n*Status:* Active ✅` });
             }
             else if (command === 'song' || command === 'play' || command === 'video') {
                 if (!q) return await sock.sendMessage(from, { text: `*Example:* .song Faded Alan Walker` });
-                await sock.sendMessage(from, { text: `*🎵 Searching ${q}... - EMMANUEL-BOT-V4*` });
+                await sock.sendMessage(from, { text: `*🎵 Searching ${q}...*` });
                 try {
                     const search = await yts(q);
                     const video = search.videos[0];
                     if (!video) return await sock.sendMessage(from, { text: `No result for ${q}` });
-                    await sock.sendMessage(from, { text: `*🎵 FOUND - EMMANUEL-BOT-V4*\n\n*Title:* ${video.title}\n*Duration:* ${video.timestamp}\n*Views:* ${video.views}\n*Url:* ${video.url}\n\n*Watch/Download from link!*` });
+                    await sock.sendMessage(from, { text: `*🎵 FOUND*\n\n*Title:* ${video.title}\n*Duration:* ${video.timestamp}\n*Views:* ${video.views}\n*Url:* ${video.url}` });
                 } catch (e) { await sock.sendMessage(from, { text: `Error: ${e.message}` }); }
             }
             else if (command === 'sticker' || command === 's') {
-                await sock.sendMessage(from, { text: `*EMMANUEL-BOT-V4 Sticker:*\n\nSend image with caption .sticker\n\nFull sticker needs sharp lib, this is base version!` });
+                await sock.sendMessage(from, { text: `*Sticker:* Send image with caption .sticker` });
             }
             else {
-                await sock.sendMessage(from, { text: `*Unknown: ${command} - EMMANUEL-BOT-V4*\nType *.menu*` });
+                await sock.sendMessage(from, { text: `*Unknown: ${command}*\nType *.menu*` });
             }
         } catch (e) { console.log("Handler Error:", e); }
     });
